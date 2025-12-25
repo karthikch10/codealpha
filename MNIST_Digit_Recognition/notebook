@@ -1,0 +1,186 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.utils import plot_model
+
+from sklearn.metrics import accuracy_score
+
+import warnings
+warnings.filterwarnings("ignore")
+
+
+
+print("Loading MNIST dataset...")
+(X_train, y_train), (X_test, y_test) = mnist.load_data()
+print("Train shape:", X_train.shape, " Test shape:", X_test.shape)
+
+
+
+X_train = X_train / 255.0
+X_test = X_test / 255.0
+
+
+X_train = X_train.reshape(-1, 28, 28, 1)
+X_test = X_test.reshape(-1, 28, 28, 1)
+
+print("After reshaping:")
+print("X_train:", X_train.shape)
+print("X_test :", X_test.shape)
+
+
+num_classes = len(np.unique(y_train))
+print("Number of classes:", num_classes)
+
+
+
+plt.figure(figsize=(5,5))
+for i in range(9):
+    plt.subplot(3,3,i+1)
+    plt.imshow(X_train[i].reshape(28,28), cmap='gray')
+    plt.title(f"Label: {y_train[i]}")
+    plt.axis('off')
+plt.suptitle("Sample MNIST Digits")
+plt.tight_layout()
+plt.show()
+
+
+
+model = Sequential([
+    Conv2D(32, (3,3), activation='relu', input_shape=(28,28,1)),
+    MaxPooling2D(2,2),
+
+    Conv2D(64, (3,3), activation='relu'),
+    MaxPooling2D(2,2),
+
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dense(10, activation='softmax')  
+])
+
+print("Model Summary:")
+model.summary()
+
+
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',  
+    metrics=['accuracy']
+)
+
+
+
+print("\nTraining the model...")
+history = model.fit(
+    X_train, y_train,
+    epochs=5,
+    batch_size=64,
+    validation_split=0.1,  
+    verbose=1
+)
+
+
+
+print("\nEvaluating on test set...")
+test_loss, test_acc = model.evaluate(X_test, y_test, verbose=0)
+print(f"Test Loss: {test_loss:.4f}")
+print(f"Test Accuracy: {test_acc * 100:.2f}%")
+
+
+
+history_dict = history.history
+
+acc = history_dict['accuracy']
+val_acc = history_dict['val_accuracy']
+loss = history_dict['loss']
+val_loss = history_dict['val_loss']
+
+epochs = range(1, len(acc) + 1)
+
+plt.figure(figsize=(12,4))
+
+
+plt.subplot(1,2,1)
+plt.plot(epochs, acc, label='Train Accuracy')
+plt.plot(epochs, val_acc, label='Validation Accuracy')
+plt.title('Accuracy vs Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+
+
+plt.subplot(1,2,2)
+plt.plot(epochs, loss, label='Train Loss')
+plt.plot(epochs, val_loss, label='Validation Loss')
+plt.title('Loss vs Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+
+
+print("\nMaking predictions on test data...")
+y_prob = model.predict(X_test)          
+y_pred = np.argmax(y_prob, axis=1)      
+
+print("Sklearn Accuracy Check:", accuracy_score(y_test, y_pred))
+
+
+
+plt.figure(figsize=(8,8))
+for i in range(9):
+    plt.subplot(3,3,i+1)
+    plt.imshow(X_test[i].reshape(28,28), cmap='gray')
+    plt.title(f"Pred: {y_pred[i]} | True: {y_test[i]}")
+    plt.axis('off')
+plt.suptitle("Sample Predictions (May be correct/incorrect)")
+plt.tight_layout()
+plt.show()
+
+
+
+wrong_indices = np.where(y_pred != y_test)[0]
+print("Number of misclassified samples:", len(wrong_indices))
+
+if len(wrong_indices) > 0:
+    plt.figure(figsize=(8,8))
+    for i, index in enumerate(wrong_indices[:9]):
+        plt.subplot(3,3,i+1)
+        plt.imshow(X_test[index].reshape(28,28), cmap='gray')
+        plt.title(f"Pred: {y_pred[index]} | True: {y_test[index]}")
+        plt.axis('off')
+    plt.suptitle("Some Misclassified Digits")
+    plt.tight_layout()
+    plt.show()
+else:
+    print("No misclassifications found (perfect accuracy on sampled test set).")
+
+
+
+model_filename = "mnist_digit_recognition_model.h5"
+model.save(model_filename)
+print(f"\nModel saved as: {model_filename}")
+
+
+
+loaded_model = load_model(model_filename)
+sample_index = 0
+
+sample_image = X_test[sample_index].reshape(1, 28, 28, 1)
+sample_true_label = y_test[sample_index]
+
+sample_pred_prob = loaded_model.predict(sample_image)
+sample_pred_label = np.argmax(sample_pred_prob, axis=1)[0]
+
+plt.imshow(X_test[sample_index].reshape(28,28), cmap='gray')
+plt.title(f"Loaded Model Prediction: {sample_pred_label} | True: {sample_true_label}")
+plt.axis('off')
+plt.show()
+
+print("\nDemo prediction done using loaded model.")
